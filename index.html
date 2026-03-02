@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Random Museum Art</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f5f4f0;--text:#1a1a1a;--muted:#888;--subtle:#bbb;--border:#e0dedd;--active:#e8e6e1}
+body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;font-size:14px;line-height:1.6}
+nav{display:flex;justify-content:space-between;align-items:center;padding:20px 32px;position:relative}
+.site-title{font-size:12px;font-weight:400;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+.settings-wrap{position:relative}
+#settings-btn{background:none;border:none;cursor:pointer;font-family:inherit;font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;padding:6px 10px;transition:color .2s}
+#settings-btn:hover{color:var(--text)}
+.dropdown{display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--bg);border:1px solid var(--border);min-width:230px;z-index:100;padding:6px 0}
+.dropdown.open{display:block}
+.dropdown-section{padding:4px 0;border-bottom:1px solid var(--border)}
+.dropdown-section:last-child{border-bottom:none}
+.dropdown-label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);padding:6px 16px 4px}
+.dropdown-item{display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;font-family:inherit;font-size:13px;color:var(--text);padding:8px 16px;cursor:pointer;text-align:left;transition:background .15s}
+.dropdown-item:hover{background:var(--active)}
+.dropdown-item.active{background:var(--active)}
+.check{width:14px;height:14px;display:flex;align-items:center;justify-content:center;font-size:11px;opacity:0;flex-shrink:0}
+.dropdown-item.active .check{opacity:1}
+
+main{flex:1;display:flex;flex-direction:column;align-items:center;padding:40px 32px 60px}
+.artwork-container{width:100%;max-width:860px;display:flex;flex-direction:column;align-items:center}
+
+.stage{width:100%;display:flex;flex-direction:column;align-items:center;transition:opacity .35s ease}
+.stage.fading{opacity:0;pointer-events:none}
+
+/* LOADING PANEL */
+.load-panel{
+  width:100%;min-height:420px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:28px;
+  position:relative;
+}
+.load-panel.hidden{display:none}
+
+/* Progress bar track */
+.progress-track{
+  width:220px;height:1px;background:var(--border);position:relative;overflow:hidden;
+}
+.progress-bar{
+  position:absolute;left:0;top:0;height:100%;width:0%;
+  background:var(--muted);transition:width .3s ease;
+}
+
+/* Status text */
+.load-status{
+  font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);
+  min-height:16px;text-align:center;
+}
+
+/* Scanning animation — thin line sweeping */
+@keyframes scan{
+  0%{transform:translateX(-100%)}
+  100%{transform:translateX(500%)}
+}
+.scan-line{
+  position:absolute;left:0;top:0;height:100%;width:20%;
+  background:linear-gradient(90deg,transparent,var(--muted),transparent);
+  animation:scan 1.4s ease-in-out infinite;
+  opacity:0;transition:opacity .3s;
+}
+.progress-track.scanning .scan-line{opacity:1}
+.progress-track.scanning .progress-bar{transition:none}
+
+/* Thumbnail that progressive-loads */
+.img-wrap{width:100%;display:flex;justify-content:center;position:relative}
+#artwork-img{
+  max-height:76vh;max-width:100%;object-fit:contain;display:block;
+  opacity:0;transition:opacity .5s ease;
+  /* blur clears as image decodes */
+  filter:blur(12px);
+}
+#artwork-img.decoding{opacity:1;filter:blur(12px)}
+#artwork-img.visible{opacity:1;filter:blur(0);transition:opacity .5s ease, filter .6s ease}
+
+.credit{margin-top:14px;font-size:11px;color:var(--subtle);letter-spacing:.04em}
+
+#read-more-btn{background:none;border:none;font-family:inherit;font-size:12px;color:var(--muted);cursor:pointer;margin-top:16px;padding:4px 0;opacity:.55;transition:opacity .2s;letter-spacing:.04em}
+#read-more-btn:hover{opacity:1}
+
+#metadata{display:none;margin-top:28px;width:100%;max-width:480px;text-align:center}
+#metadata.visible{display:block}
+.meta-title{font-size:19px;font-weight:400;color:var(--text);margin-bottom:10px;line-height:1.4}
+.meta-artist{font-size:13px;font-weight:300;color:var(--muted);margin-bottom:4px}
+.meta-date{font-size:12px;color:var(--subtle);margin-bottom:4px}
+.meta-dept{font-size:11px;color:var(--subtle);letter-spacing:.06em;text-transform:uppercase;margin-bottom:20px}
+.meta-link{font-size:11px;color:var(--muted);text-decoration:none;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border);padding-bottom:1px;transition:color .2s}
+.meta-link:hover{color:var(--text)}
+
+.controls{margin-top:52px;display:flex;flex-direction:column;align-items:center;gap:16px}
+#new-art-btn{background:none;border:1px solid var(--border);font-family:inherit;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:10px 28px;cursor:pointer;transition:border-color .2s,color .2s}
+#new-art-btn:hover{border-color:#bbb;color:var(--text)}
+#new-art-btn:disabled{opacity:.4;cursor:default}
+
+.hint-wrap{min-height:24px;overflow:visible;position:relative;width:100%;max-width:500px;text-align:center}
+.hint{position:relative;width:100%;text-align:center;font-size:11px;color:var(--subtle);letter-spacing:.04em;opacity:0;transition:opacity .5s ease,transform .5s ease;transform:translateY(6px)}
+.hint.active{opacity:1;transform:translateY(0)}
+.hint.exit{opacity:0;transform:translateY(-6px)}
+
+#error-msg{display:none;color:var(--subtle);font-size:12px;margin-top:24px;text-align:center}
+@media(max-width:600px){nav{padding:16px 20px}main{padding:24px 20px 48px}}
+</style>
+</head>
+<body>
+<nav>
+  <span class="site-title">Random Museum Art</span>
+  <div class="settings-wrap">
+    <button id="settings-btn">Settings</button>
+    <div class="dropdown" id="dropdown">
+      <div class="dropdown-section">
+        <div class="dropdown-label">Source</div>
+        <button class="dropdown-item" data-source="met"><span class="check">✓</span> The Met</button>
+        <button class="dropdown-item" data-source="aic"><span class="check">✓</span> Art Institute of Chicago</button>
+        <button class="dropdown-item" data-source="surprise"><span class="check">✓</span> Surprise — alternate sources</button>
+      </div>
+      <div class="dropdown-section">
+        <div class="dropdown-label">Mode</div>
+        <button class="dropdown-item" id="explorer-toggle"><span class="check">✓</span> Explorer Mode — all object types</button>
+      </div>
+      <div class="dropdown-section">
+        <div class="dropdown-label">Display</div>
+        <button class="dropdown-item" id="autoplay-toggle"><span class="check">✓</span> Autoplay — new art every 30s</button>
+        <button class="dropdown-item" id="dark-toggle"><span class="check">✓</span> Dark mode</button>
+      </div>
+    </div>
+  </div>
+</nav>
+<main>
+  <div class="artwork-container">
+    <div class="stage" id="stage">
+
+      <!-- Loading panel (shown while fetching) -->
+      <div class="load-panel" id="load-panel">
+        <div class="progress-track scanning" id="progress-track">
+          <div class="progress-bar" id="progress-bar"></div>
+          <div class="scan-line"></div>
+        </div>
+        <div class="load-status" id="load-status">Contacting museum</div>
+      </div>
+
+      <!-- Image (shown once loaded) -->
+      <div class="img-wrap" id="img-wrap" style="display:none">
+        <img id="artwork-img" alt="" />
+      </div>
+
+      <div class="credit" id="credit"></div>
+      <button id="read-more-btn" style="display:none">Read more</button>
+      <div id="metadata">
+        <div class="meta-title" id="meta-title"></div>
+        <div class="meta-artist" id="meta-artist"></div>
+        <div class="meta-date" id="meta-date"></div>
+        <div class="meta-dept" id="meta-dept"></div>
+        <a class="meta-link" id="meta-link" href="#" target="_blank" rel="noopener">View at museum ↗</a>
+      </div>
+    </div>
+
+    <div id="error-msg">Unable to load artwork. Please try again.</div>
+
+    <div class="controls">
+      <button id="new-art-btn">New work</button>
+      <div class="hint-wrap">
+        <div class="hint active" id="hint-display"></div>
+      </div>
+    </div>
+  </div>
+</main>
+<script>
+// ── State ─────────────────────────────────────────────────────
+let source = localStorage.getItem('rma-source') || 'met';
+let explorerMode = localStorage.getItem('rma-explorer') === 'true';
+let autoplay = localStorage.getItem('rma-autoplay') === 'true';
+let darkMode = localStorage.getItem('rma-dark') === 'true';
+let metIds = null, metExIds = null, currentCtrl = null, metaVisible = false;
+let autoplayTimer = null;
+
+// ── Hints ─────────────────────────────────────────────────────
+const hints = [
+  'Try Explorer Mode for objects, prints & fragments',
+  'Surprise mode alternates between both museums',
+  'Autoplay rotates to a new work every 30 seconds',
+  'Read more reveals title, date & department',
+  '"View at museum" opens the original catalogue entry',
+  'Switch to Dark mode for a gallery-at-night feel',
+  'The Met has over 470,000 artworks with images',
+  'AIC holds one of the largest collections in the US',
+];
+let hintIndex = 0;
+const hintEl = document.getElementById('hint-display');
+function cycleHint() {
+  hintEl.classList.remove('active'); hintEl.classList.add('exit');
+  setTimeout(() => {
+    hintIndex = (hintIndex + Math.floor(Math.random() * (hints.length - 1)) + 1) % hints.length;
+    hintEl.textContent = hints[hintIndex];
+    hintEl.classList.remove('exit'); hintEl.classList.add('active');
+  }, 500);
+}
+hintEl.textContent = hints[0];
+setInterval(cycleHint, 5000);
+
+// ── DOM ───────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const settingsBtn=$('settings-btn'), dropdown=$('dropdown');
+const explorerToggle=$('explorer-toggle'), autoplayToggle=$('autoplay-toggle'), darkToggle=$('dark-toggle');
+const stage=$('stage'), loadPanel=$('load-panel'), imgWrap=$('img-wrap');
+const progressTrack=$('progress-track'), progressBar=$('progress-bar'), loadStatus=$('load-status');
+const img=$('artwork-img'), credit=$('credit');
+const readMoreBtn=$('read-more-btn'), metadata=$('metadata');
+const metTitle=$('meta-title'), metArtist=$('meta-artist'), metDate=$('meta-date');
+const metDept=$('meta-dept'), metLink=$('meta-link');
+const errorMsg=$('error-msg'), newArtBtn=$('new-art-btn');
+const sourceItems = document.querySelectorAll('[data-source]');
+
+// ── Progress helpers ──────────────────────────────────────────
+let progressValue = 0;
+let progressInterval = null;
+
+function setProgress(pct, statusText) {
+  progressValue = pct;
+  progressBar.style.width = pct + '%';
+  if (statusText !== undefined) loadStatus.textContent = statusText;
+}
+
+function startScan() {
+  progressTrack.classList.add('scanning');
+  progressBar.style.width = '0%';
+}
+
+function stopScan() {
+  progressTrack.classList.remove('scanning');
+}
+
+// Simulated crawl for API steps (no real byte progress available for cross-origin)
+function crawlTo(target, statusText, durationMs = 600) {
+  return new Promise(res => {
+    stopScan();
+    if (statusText) loadStatus.textContent = statusText;
+    const start = progressValue;
+    const diff = target - start;
+    const fps = 30;
+    const steps = Math.round(durationMs / (1000 / fps));
+    let step = 0;
+    clearInterval(progressInterval);
+    progressInterval = setInterval(() => {
+      step++;
+      const t = step / steps;
+      const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      setProgress(start + diff * ease);
+      if (step >= steps) { clearInterval(progressInterval); setProgress(target); res(); }
+    }, 1000 / fps);
+  });
+}
+
+// ── Image load with real XHR progress ────────────────────────
+function loadImageWithProgress(url) {
+  return new Promise((resolve, reject) => {
+    // Use XHR to get real download progress
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.responseType = 'blob';
+
+    let lastPct = 60;
+
+    xhr.onprogress = e => {
+      stopScan();
+      if (e.lengthComputable) {
+        const pct = 60 + (e.loaded / e.total) * 35;
+        lastPct = pct;
+        const kb = Math.round(e.loaded / 1024);
+        const total = Math.round(e.total / 1024);
+        setProgress(pct, `Downloading image — ${kb} / ${total} KB`);
+      } else {
+        // Unknown size — show bytes and scan
+        progressTrack.classList.add('scanning');
+        const kb = Math.round(e.loaded / 1024);
+        loadStatus.textContent = `Downloading image — ${kb} KB received`;
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const blobUrl = URL.createObjectURL(xhr.response);
+        resolve(blobUrl);
+      } else {
+        reject(new Error('Image fetch failed: ' + xhr.status));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error('Network error loading image'));
+    xhr.ontimeout = () => reject(new Error('Image load timed out'));
+    xhr.timeout = 20000;
+    xhr.send();
+  });
+}
+
+// ── Dark mode ─────────────────────────────────────────────────
+function applyDark() {
+  const r = document.documentElement.style;
+  if (darkMode) {
+    r.setProperty('--bg','#111110'); r.setProperty('--text','#e8e6e1');
+    r.setProperty('--muted','#777'); r.setProperty('--subtle','#555');
+    r.setProperty('--border','#2a2a28'); r.setProperty('--active','#1e1e1c');
+  } else {
+    r.setProperty('--bg','#f5f4f0'); r.setProperty('--text','#1a1a1a');
+    r.setProperty('--muted','#888'); r.setProperty('--subtle','#bbb');
+    r.setProperty('--border','#e0dedd'); r.setProperty('--active','#e8e6e1');
+  }
+}
+
+function startAutoplay() {
+  clearInterval(autoplayTimer);
+  if (autoplay) autoplayTimer = setInterval(loadArtwork, 30000);
+}
+
+function syncUI() {
+  sourceItems.forEach(el => el.classList.toggle('active', el.dataset.source === source));
+  explorerToggle.classList.toggle('active', explorerMode);
+  autoplayToggle.classList.toggle('active', autoplay);
+  darkToggle.classList.toggle('active', darkMode);
+}
+
+// ── Settings ──────────────────────────────────────────────────
+settingsBtn.addEventListener('click', e => { e.stopPropagation(); dropdown.classList.toggle('open'); });
+document.addEventListener('click', () => dropdown.classList.remove('open'));
+dropdown.addEventListener('click', e => e.stopPropagation());
+sourceItems.forEach(el => el.addEventListener('click', () => {
+  source = el.dataset.source; localStorage.setItem('rma-source', source);
+  syncUI(); dropdown.classList.remove('open'); loadArtwork();
+}));
+explorerToggle.addEventListener('click', () => {
+  explorerMode = !explorerMode; localStorage.setItem('rma-explorer', explorerMode);
+  metIds = null; metExIds = null; syncUI(); dropdown.classList.remove('open'); loadArtwork();
+});
+autoplayToggle.addEventListener('click', () => {
+  autoplay = !autoplay; localStorage.setItem('rma-autoplay', autoplay);
+  syncUI(); startAutoplay(); dropdown.classList.remove('open');
+});
+darkToggle.addEventListener('click', () => {
+  darkMode = !darkMode; localStorage.setItem('rma-dark', darkMode);
+  applyDark(); syncUI(); dropdown.classList.remove('open');
+});
+readMoreBtn.addEventListener('click', () => {
+  metaVisible = !metaVisible;
+  metadata.classList.toggle('visible', metaVisible);
+  readMoreBtn.textContent = metaVisible ? 'Hide details' : 'Read more';
+});
+newArtBtn.addEventListener('click', loadArtwork);
+
+// ── Helpers ───────────────────────────────────────────────────
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function hideError() { errorMsg.style.display = 'none'; }
+function showError(msg) {
+  errorMsg.style.display = 'block';
+  errorMsg.textContent = msg;
+  loadPanel.classList.add('hidden');
+  newArtBtn.disabled = false;
+  readMoreBtn.style.display = 'none';
+  clearInterval(progressInterval);
+}
+
+function resetStage() {
+  img.classList.remove('visible', 'decoding');
+  img.src = '';
+  imgWrap.style.display = 'none';
+  loadPanel.classList.remove('hidden');
+  credit.textContent = '';
+  readMoreBtn.style.display = 'none';
+  metadata.classList.remove('visible');
+  metaVisible = false;
+  readMoreBtn.textContent = 'Read more';
+  progressValue = 0;
+  progressBar.style.width = '0%';
+  startScan();
+  loadStatus.textContent = 'Contacting museum';
+}
+
+// ── Render ─────────────────────────────────────────────────────
+async function renderArtwork({ blobUrl, title, artist, date, dept, museumUrl, creditLine }) {
+  hideError();
+
+  // Fill metadata
+  img.alt = title + (artist ? ' by ' + artist : '');
+  credit.textContent = creditLine || '';
+  metTitle.textContent = title || 'Untitled';
+  metArtist.textContent = artist || '';
+  metDate.textContent = date || '';
+  metDept.textContent = dept || '';
+  metLink.href = museumUrl || '#';
+
+  // Decode step
+  await crawlTo(97, 'Decoding image', 300);
+
+  // Show image blurry immediately
+  img.src = blobUrl;
+  img.classList.add('decoding');
+  imgWrap.style.display = 'flex';
+
+  // Wait for browser decode
+  try { await img.decode(); } catch(e) {}
+
+  // Complete bar, hide panel
+  await crawlTo(100, 'Done', 200);
+  await new Promise(r => setTimeout(r, 150));
+
+  loadPanel.classList.add('hidden');
+  stopScan();
+
+  // Sharp reveal
+  img.classList.remove('decoding');
+  img.classList.add('visible');
+
+  // Fade stage back in
+  stage.classList.remove('fading');
+  newArtBtn.disabled = false;
+  readMoreBtn.style.display = '';
+  cycleHint();
+}
+
+// ── APIs ──────────────────────────────────────────────────────
+async function fetchMet(signal) {
+  const q = explorerMode ? '*' : 'painting';
+  let ids = explorerMode ? metExIds : metIds;
+  if (!ids) {
+    const r = await fetch(`https://collectionapi.metmuseum.org/public/collection/v1/search?hasImages=true&q=${q}`, { signal });
+    const d = await r.json(); ids = d.objectIDs || [];
+    if (explorerMode) metExIds = ids; else metIds = ids;
+  }
+  if (!ids.length) throw new Error('No results');
+  for (let i = 0; i < 6; i++) {
+    const id = pick(ids);
+    const r = await fetch(`https://collectionapi.metmuseum.org/public/collection/v1/objects/${id}`, { signal });
+    const o = await r.json();
+    const imageUrl = o.primaryImageSmall || o.primaryImage;
+    if (!imageUrl) continue;
+    return { imageUrl, title: o.title || 'Untitled', artist: o.artistDisplayName || '', date: o.objectDate || '', dept: o.department || '', museumUrl: o.objectURL || '', creditLine: 'The Metropolitan Museum of Art' };
+  }
+  throw new Error('No valid artwork found');
+}
+
+async function fetchAIC(signal) {
+  const q = explorerMode ? '*' : 'painting';
+  const page = Math.floor(Math.random() * 40) + 1;
+  const r = await fetch(`https://api.artic.edu/api/v1/artworks/search?q=${encodeURIComponent(q)}&fields=id,title,image_id,artist_title,date_display,department_title&limit=20&page=${page}`, { signal });
+  const d = await r.json();
+  const valid = (d.data || []).filter(a => a.image_id);
+  if (!valid.length) throw new Error('No AIC results');
+  const art = pick(valid);
+  return { imageUrl: `https://www.artic.edu/iiif/2/${art.image_id}/full/843,/0/default.jpg`, title: art.title || 'Untitled', artist: art.artist_title || '', date: art.date_display || '', dept: art.department_title || '', museumUrl: `https://www.artic.edu/artworks/${art.id}`, creditLine: 'Art Institute of Chicago' };
+}
+
+// ── Main load ─────────────────────────────────────────────────
+async function loadArtwork() {
+  if (currentCtrl) currentCtrl.abort();
+  currentCtrl = new AbortController();
+  const signal = currentCtrl.signal;
+
+  newArtBtn.disabled = true;
+
+  // Fade out
+  stage.classList.add('fading');
+  await new Promise(r => setTimeout(r, 350));
+  resetStage();
+  stage.classList.remove('fading'); // panel visible, no img yet
+  hideError();
+
+  const eff = source === 'surprise' ? (Math.random() < .5 ? 'met' : 'aic') : source;
+  const museumName = eff === 'met' ? 'The Met' : 'Art Institute of Chicago';
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      // Step 1 — search API
+      await crawlTo(15, `Searching ${museumName} collection`, 400);
+      const artData = eff === 'met' ? await fetchMet(signal) : await fetchAIC(signal);
+
+      // Step 2 — found it
+      await crawlTo(45, `Found "${artData.title.slice(0, 40)}${artData.title.length > 40 ? '…' : ''}"`, 300);
+
+      // Step 3 — download image via XHR for real progress
+      await crawlTo(60, 'Requesting image from server', 200);
+      const blobUrl = await loadImageWithProgress(artData.imageUrl);
+
+      await renderArtwork({ ...artData, blobUrl });
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      if (attempt < 2) {
+        await crawlTo(0, `Retrying… (attempt ${attempt + 2})`, 300);
+        startScan();
+      }
+    }
+  }
+  showError('Could not load artwork. Please try again.');
+}
+
+// ── Init ──────────────────────────────────────────────────────
+applyDark(); syncUI(); startAutoplay(); loadArtwork();
+</script>
+</body>
+</html>
