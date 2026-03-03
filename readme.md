@@ -25,5 +25,5 @@
 ## demo
 
 <img width="1920" height="1080" alt="Screenshot (85)" src="https://github.com/user-attachments/assets/603d5950-dd22-4d4d-a07c-b4e282fb9297" />
-
+<img src="https://github.com/user-attachments/assets/ddad5bd3-4fda-4052-ae59-34573c32739d" width="400">
 </div>
